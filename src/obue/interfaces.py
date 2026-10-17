@@ -40,8 +40,7 @@ _SCPI_DESCRIPTION = (
     'Acquisition: INIT:CONT OFF, INIT:IMM, *OPC?, TRAC:DATA? TRACE1. '
     'Trace response is comma-separated dBm values for the selected benchmark scan. '
     'SYST:ERR? reads the error queue. '
-    'scan_index (default 0) is MCP scan selection, not a vendor SCPI suffix. '
-    'No SIM commands are supported.')
+    'scan_index (default 0) is MCP scan selection, not a vendor SCPI suffix.')
 
 
 def scpi_enum_token(field, value):
