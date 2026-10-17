@@ -1,0 +1,344 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ee594:obue:plan:v3",
+  "title": "OBUE measurement plan",
+  "$defs": {
+    "frequency": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "type": "number"
+        },
+        "unit": {
+          "enum": [
+            "Hz",
+            "kHz",
+            "MHz",
+            "GHz"
+          ]
+        }
+      },
+      "required": [
+        "value",
+        "unit"
+      ]
+    },
+    "power": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "type": "number"
+        },
+        "unit": {
+          "enum": [
+            "dBm"
+          ]
+        }
+      },
+      "required": [
+        "value",
+        "unit"
+      ]
+    },
+    "ratio": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "type": "number"
+        },
+        "unit": {
+          "enum": [
+            "dB"
+          ]
+        }
+      },
+      "required": [
+        "value",
+        "unit"
+      ]
+    },
+    "dut_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "band": {
+          "const": "n78"
+        },
+        "bs_type": {
+          "const": "1-C"
+        },
+        "bs_class": {
+          "const": "wide_area"
+        },
+        "emission_category": {
+          "const": "A"
+        },
+        "carrier_center": {
+          "$ref": "#/$defs/frequency"
+        },
+        "channel_bandwidth": {
+          "$ref": "#/$defs/frequency"
+        },
+        "subcarrier_spacing": {
+          "$ref": "#/$defs/frequency"
+        },
+        "rated_output_power": {
+          "$ref": "#/$defs/power"
+        },
+        "test_model": {
+          "enum": [
+            "NR-FR1-TM1.1",
+            "NR-FR1-TM1.2"
+          ]
+        }
+      },
+      "required": [
+        "band",
+        "bs_type",
+        "bs_class",
+        "emission_category",
+        "carrier_center",
+        "channel_bandwidth",
+        "subcarrier_spacing",
+        "rated_output_power",
+        "test_model"
+      ]
+    },
+    "analyzer_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "center_frequency": {
+          "$ref": "#/$defs/frequency"
+        },
+        "span": {
+          "$ref": "#/$defs/frequency"
+        },
+        "rbw": {
+          "$ref": "#/$defs/frequency"
+        },
+        "vbw": {
+          "$ref": "#/$defs/frequency"
+        },
+        "attenuation": {
+          "$ref": "#/$defs/ratio"
+        },
+        "reference_level": {
+          "$ref": "#/$defs/power"
+        },
+        "detector": {
+          "enum": [
+            "true_rms",
+            "peak",
+            "sample"
+          ]
+        },
+        "averaging_domain": {
+          "enum": [
+            "power",
+            "log",
+            "none"
+          ]
+        },
+        "preamp_enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "center_frequency",
+        "span",
+        "rbw",
+        "vbw",
+        "attenuation",
+        "reference_level",
+        "detector",
+        "averaging_domain",
+        "preamp_enabled"
+      ]
+    },
+    "scan_region": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "side": {
+          "enum": [
+            "lower",
+            "upper"
+          ]
+        },
+        "start_offset": {
+          "$ref": "#/$defs/frequency"
+        },
+        "stop_offset": {
+          "$ref": "#/$defs/frequency"
+        },
+        "step": {
+          "$ref": "#/$defs/frequency"
+        },
+        "measurement_bandwidth": {
+          "$ref": "#/$defs/frequency"
+        }
+      },
+      "required": [
+        "side",
+        "start_offset",
+        "stop_offset",
+        "step",
+        "measurement_bandwidth"
+      ]
+    },
+    "scan": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "test_model": {
+          "enum": [
+            "NR-FR1-TM1.1",
+            "NR-FR1-TM1.2"
+          ]
+        },
+        "region": {
+          "$ref": "#/$defs/scan_region"
+        },
+        "analyzer": {
+          "$ref": "#/$defs/analyzer_state"
+        }
+      },
+      "required": [
+        "test_model",
+        "region",
+        "analyzer"
+      ]
+    },
+    "reading": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "test_model": {
+          "enum": [
+            "NR-FR1-TM1.1",
+            "NR-FR1-TM1.2"
+          ]
+        },
+        "side": {
+          "enum": [
+            "lower",
+            "upper"
+          ]
+        },
+        "offset_hz": {
+          "type": "number",
+          "minimum": 1
+        },
+        "frequency_hz": {
+          "type": "number",
+          "minimum": 1
+        },
+        "value": {
+          "type": "number"
+        },
+        "unit": {
+          "const": "dBm"
+        },
+        "measurement_bandwidth_hz": {
+          "type": "number",
+          "minimum": 1
+        },
+        "effective_bandwidth_hz": {
+          "type": "number",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "test_model",
+        "side",
+        "offset_hz",
+        "frequency_hz",
+        "value",
+        "unit",
+        "measurement_bandwidth_hz",
+        "effective_bandwidth_hz"
+      ]
+    },
+    "measurement_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "readings": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/reading"
+          }
+        },
+        "reference_plane": {
+          "const": "transmitter"
+        },
+        "state_snapshot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scan_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "overload": {
+          "type": "boolean"
+        },
+        "simulated_time_s": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "readings",
+        "reference_plane",
+        "state_snapshot_id",
+        "scan_index",
+        "overload",
+        "simulated_time_s"
+      ]
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "profile_id": {
+      "const": "n78_wa_cat_a_100m_30k_midchannel_r18"
+    },
+    "dut": {
+      "$ref": "#/$defs/dut_state"
+    },
+    "scans": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": {
+        "$ref": "#/$defs/scan"
+      }
+    },
+    "scope": {
+      "enum": [
+        "full_analytical",
+        "near_channel_nr"
+      ]
+    },
+    "external_loss_db": {
+      "const": 40
+    },
+    "actual_output_power_dbm": {
+      "const": 46
+    }
+  },
+  "required": [
+    "profile_id",
+    "dut",
+    "scans",
+    "scope",
+    "external_loss_db",
+    "actual_output_power_dbm"
+  ]
+}

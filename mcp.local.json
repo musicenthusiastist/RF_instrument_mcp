@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "fsva3000-simulator": {
+      "command": "/Users/xiranz./Documents/EE594_MasterThesis/week1_obue/.venv/bin/python",
+      "args": [
+        "-m",
+        "obue.mcp_server",
+        "--condition",
+        "C",
+        "--scenario",
+        "N01"
+      ],
+      "env": {
+        "PYTHONPATH": "/Users/xiranz./Documents/EE594_MasterThesis/week1_obue/src",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    }
+  }
+}

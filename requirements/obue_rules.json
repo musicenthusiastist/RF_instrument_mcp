@@ -1,0 +1,119 @@
+{
+  "metadata": {
+    "profile_id": "n78_wa_cat_a_100m_30k_midchannel_r18",
+    "title": "Frozen n78 conducted OBUE research profile",
+    "release": 18,
+    "status": "week_1_frozen",
+    "normative_sources": [
+      {
+        "specification": "3GPP TS 38.104",
+        "version": "18.13.0",
+        "url": "https://www.etsi.org/deliver/etsi_ts/138100_138199/138104/18.13.00_60/ts_138104v181300p.pdf"
+      },
+      {
+        "specification": "3GPP TS 38.141-1",
+        "version": "18.13.0",
+        "url": "https://www.etsi.org/deliver/etsi_ts/138100_138199/13814101/18.13.00_60/ts_13814101v181300p.pdf"
+      }
+    ]
+  },
+  "dut_profile": {
+    "band": "n78",
+    "duplex_mode": "TDD",
+    "band_lower_hz": 3300000000,
+    "band_upper_hz": 3800000000,
+    "bs_type": "1-C",
+    "bs_class": "wide_area",
+    "emission_category": "A",
+    "operation": "single_band_single_carrier",
+    "connector_count": 1,
+    "carrier_center_hz": 3550000000,
+    "channel_bandwidth_hz": 100000000,
+    "subcarrier_spacing_hz": 30000,
+    "rated_output_power_dbm": 46.0,
+    "required_test_models": [
+      "NR-FR1-TM1.1",
+      "NR-FR1-TM1.2"
+    ]
+  },
+  "derived_geometry": {
+    "channel_lower_edge_hz": 3500000000,
+    "channel_upper_edge_hz": 3600000000,
+    "delta_f_obue_hz": 40000000,
+    "lower_scan_stop_hz": 3260000000,
+    "upper_scan_stop_hz": 3840000000,
+    "f_offset_max_hz_each_side": 240000000
+  },
+  "obue_mask": {
+    "table": "38.104 Table 6.6.4.2.1-2",
+    "regions": [
+      {
+        "id": "near_sloped",
+        "centre_offset_start_hz": 50000,
+        "centre_offset_stop_exclusive_hz": 5050000,
+        "centre_step_hz": 100000,
+        "measurement_bandwidth_hz": 100000,
+        "limit": {
+          "kind": "linear_dbm",
+          "expression": "-7.0 - 1.4 * (f_offset_mhz - 0.05)"
+        }
+      },
+      {
+        "id": "near_flat",
+        "centre_offset_start_hz": 5050000,
+        "centre_offset_stop_exclusive_hz": 10050000,
+        "centre_step_hz": 100000,
+        "measurement_bandwidth_hz": 100000,
+        "limit": {
+          "kind": "constant_dbm",
+          "value": -14.0
+        }
+      },
+      {
+        "id": "far_flat",
+        "centre_offset_start_hz": 10500000,
+        "centre_offset_stop_exclusive_hz": 240000000,
+        "centre_step_hz": 1000000,
+        "measurement_bandwidth_hz": 1000000,
+        "limit": {
+          "kind": "constant_dbm",
+          "value": -13.0
+        }
+      }
+    ]
+  },
+  "procedure": {
+    "detector": "true_rms",
+    "averaging_domain": "power",
+    "rbw_rule": "equal_to_measurement_bandwidth",
+    "scan_coverage": "contiguous_filter_boundaries",
+    "test_at_rated_output_power": true,
+    "required_test_models": [
+      "NR-FR1-TM1.1",
+      "NR-FR1-TM1.2"
+    ],
+    "measurement_sides": [
+      "lower",
+      "upper"
+    ]
+  },
+  "benchmark_decision_policy": {
+    "pass": "all required valid powers <= limits",
+    "fail": "any valid power > its limit",
+    "otherwise": "invalid/incomplete",
+    "reference_plane": "transmitter",
+    "external_loss_db": 40
+  },
+  "scope_exclusions": [
+    "ACLR",
+    "spurious_emissions",
+    "OTA",
+    "carrier_aggregation",
+    "multiband_operation",
+    "non_contiguous_spectrum",
+    "BS_type_1-H",
+    "Category_B",
+    "NB-IoT",
+    "required_hardware_validation"
+  ]
+}

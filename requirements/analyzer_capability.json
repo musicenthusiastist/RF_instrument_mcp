@@ -1,0 +1,35 @@
+{
+  "profile_id": "rs_fsva3000_n78_simulator_v1",
+  "instrument_family": "R&S FSVA3000",
+  "configuration": "Common 4 GHz family profile, DC coupled, standard swept bandwidths; B24 preamplifier modeled at 15 dB. No specific hardware unit is asserted.",
+  "status": "simulation_only_not_a_vendor_emulator",
+  "source": "https://www.rohde-schwarz.com/webhelp/FSV3000_HTML_UserManuals_en/Content/welcome.htm",
+  "specifications_source": "https://scdn.rohde-schwarz.com/ur/pws/dl_downloads/pdm/cl_brochures_and_datasheets/specifications/5216_1211_22/FSVA3000_specs_en_5216-1211-22_v1601.pdf",
+  "manual_version": "16, firmware 2.50 and later",
+  "specifications_version": "16.01, August 2025",
+  "accessed": "2026-10-03",
+  "vendor_supported": {
+    "frequency_min_hz": 10,
+    "frequency_max_hz": 4000000000,
+    "rbw_min_hz": 1,
+    "rbw_max_hz": 10000000,
+    "vbw_min_hz": 1,
+    "vbw_max_hz": 10000000,
+    "attenuation_min_db": 0,
+    "attenuation_max_db": 75,
+    "preamp_gain_db": 15
+  },
+  "study_assumptions": {
+    "input_limit_dbm": 20,
+    "mixer_limit_dbm": -3,
+    "attenuation_min_db": 0,
+    "attenuation_max_db": 75,
+    "preamp_gain_db": 15,
+    "reference_level_min_dbm": -130,
+    "reference_level_max_dbm": 30,
+    "peak_detector_bias_db": 2,
+    "sample_detector_bias_db": -0.5,
+    "log_average_bias_db": -2.51
+  },
+  "limitations": "Analytical study model, not hardware protection or firmware emulation. Rectangular filters, fixed 40 dB external loss, ideal valid power integration, modeled overload and detector/averaging biases. Receiver noise and measurement uncertainty are excluded. NR input uses distinct MATLAB IQ records on a reduced near-channel grid."
+}

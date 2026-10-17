@@ -1,0 +1,19 @@
+{
+  "scope": "near_channel_nr",
+  "models": ["NR-FR1-TM1.1", "NR-FR1-TM1.2"],
+  "measurement_intervals_mhz": [[3490, 3500], [3600, 3610]],
+  "measurement_bandwidth_hz": 100000,
+  "windows_per_model": 200,
+  "sample_rate_hz": 122880000,
+  "gate_duration_s": 0.0005,
+  "tone_frequencies_hz": [3492950000, 3607050000],
+  "tone_filter_limit_dbm": -14,
+  "target_tolerance_db": 0.01,
+  "cases": [
+    {"id": "R01", "target_margin_db": 3, "expected_decision": "pass"},
+    {"id": "R02", "target_margin_db": 0.2, "expected_decision": "pass"},
+    {"id": "R03", "target_margin_db": -0.2, "expected_decision": "fail"},
+    {"id": "R04", "target_margin_db": -3, "expected_decision": "fail"}
+  ],
+  "setting_cases": ["U01", "U02", "U03", "U04", "U05", "U06", "S01", "S02", "S03", "S04", "S05", "S06"]
+}

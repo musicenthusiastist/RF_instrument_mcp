@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ee594-obue"
+version = "0.4.0"
+description = "Deterministic OBUE benchmark with analytical and MATLAB NR IQ inputs"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+test = ["jsonschema>=4.18,<5", "rfc3339-validator>=0.1.4,<1"]
+reference = ["numpy>=1.24,<3"]
+
+[project.scripts]
+obue = "obue.__main__:main"
+obue-mcp = "obue.mcp_server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.data-files]
+"share/ee594-obue/requirements" = ["requirements/obue_rules.json", "requirements/analyzer_capability.json", "requirements/nr_benchmark.json"]
+"share/ee594-obue/schemas" = ["schemas/domain.schema.json"]
