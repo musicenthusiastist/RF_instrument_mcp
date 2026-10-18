@@ -8,14 +8,14 @@ from obue.nr import verify_nr,NR_BENCHMARK
 
 base=ROOT/'outputs/nr_reference'
 result=verify_nr(base)
-(base/'verification.json').write_text(json.dumps(result,indent=2)+'\n')
+(base/'verification.json').write_text(json.dumps(result,indent=2)+'\n',encoding='utf-8')
 print('Clean NR: Python/MATLAB verification passed (400 windows).')
 for case in NR_BENCHMARK['cases']:
     directory=ROOT/'outputs/nr_cases'/case['id']
     if not directory.is_dir():
         raise FileNotFoundError('Generate controlled cases with MATLAB export_nr_cases first.')
     result=verify_nr(directory)
-    (directory/'verification.json').write_text(json.dumps(result,indent=2)+'\n')
+    (directory/'verification.json').write_text(json.dumps(result,indent=2)+'\n',encoding='utf-8')
     from obue.reference import evaluate_reference
     from obue.nr import load_nr_spectra
     reference=evaluate_reference(load_nr_spectra(directory))

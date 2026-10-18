@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "fsva3000-simulator": {
-      "command": "/Users/xiranz./Documents/EE594_MasterThesis/week1_obue/.venv/bin/python",
+      "command": "C:\\Users\\xiran\\OneDrive - The Pennsylvania State University\\Documentos\\Electrical_Engineering_MS_Penn_State\\EE 594 Master Thesis\\1\\RF_instrument_mcp\\.venv\\Scripts\\python.exe",
       "args": [
         "-m",
         "obue.mcp_server",
@@ -9,8 +9,9 @@
         "C"
       ],
       "env": {
-        "PYTHONPATH": "/Users/xiranz./Documents/EE594_MasterThesis/week1_obue/src",
-        "PYTHONDONTWRITEBYTECODE": "1"
+        "PYTHONPATH": "C:\\Users\\xiran\\OneDrive - The Pennsylvania State University\\Documentos\\Electrical_Engineering_MS_Penn_State\\EE 594 Master Thesis\\1\\RF_instrument_mcp\\src",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONUTF8": "1"
       }
     }
   }

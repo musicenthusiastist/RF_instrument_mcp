@@ -59,6 +59,14 @@ class IntegrationTests(unittest.TestCase):
             for key in ('family', 'description', 'expected_rule', 'seed', 'uncertainty', 'calibration'):
                 self.assertNotIn(key, task)
 
+    def test_neutral_instructions_only_drop_the_correction_hint(self):
+        case = scenarios()[0]
+        standard, neutral = public_task(case), public_task(case, 'neutral')
+        self.assertIn('Correct invalid settings', standard['instructions'])
+        self.assertNotIn('Correct invalid settings', neutral['instructions'])
+        self.assertEqual({k: v for k, v in standard.items() if k != 'instructions'},
+                         {k: v for k, v in neutral.items() if k != 'instructions'})
+
     def test_valid_acquisition_same_numeric_results_all_arms(self):
         output = []
         for c in ('A', 'B', 'C'):
@@ -156,6 +164,16 @@ class IntegrationTests(unittest.TestCase):
                   'invalid_attempts': 0, 'false_blocks': 0, 'valid_attempts': 0, 'eligible_complete': False,
                   'decision_error': None, 'decision_supported': False, 'adapter_errors': 0}
         self.assertEqual(summarize([record])['by_condition']['C']['eligible_completion']['denominator'], 1)
+
+    def test_decision_error_rate_is_over_reported_pass_fail_sessions(self):
+        base = {'condition': 'C', 'invalid_executions': 0, 'executed_requests': 0, 'invalid_interceptions': 0,
+                'invalid_attempts': 0, 'false_blocks': 0, 'valid_attempts': 0, 'eligible_complete': False,
+                'adapter_errors': 0}
+        records = [dict(base, decision_error=True, decision_supported=False),   # wrong, unsupported
+                   dict(base, decision_error=False, decision_supported=True),   # right
+                   dict(base, decision_error=None, decision_supported=False)]   # unparsed
+        rate = summarize(records)['by_condition']['C']['decision_error']
+        self.assertEqual((rate['numerator'], rate['denominator'], rate['rate']), (1, 2, 0.5))
 
     def test_mcp_tool_schemas_are_valid_json_schema(self):
         from jsonschema import Draft202012Validator

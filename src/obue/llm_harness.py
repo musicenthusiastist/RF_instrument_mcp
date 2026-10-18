@@ -25,7 +25,7 @@ from .mcp_server import PROTOCOL_VERSIONS, Server
 from .nr import load_nr_spectra, nr_directory as case_directory
 from .plan import plan_to_dict
 from .reference import evaluate_reference
-from .scenarios import public_task, scenarios
+from .scenarios import INSTRUCTION_VARIANTS, public_task, scenarios
 from .scoring import (ORDER_SEED, audit_events, event_counts, evidence_decision, source_hash, summarize,
                       valid_readings)
 from .simulator import Analyzer
@@ -37,7 +37,10 @@ DEFAULT_EFFORT = 'low'
 PRICES = {'claude-opus-5-5': {'input_tokens': 4.00, 'output_tokens': 20.00,
                               'cache_creation_input_tokens': 5.00, 'cache_read_input_tokens': 0.20},
           'claude-sonnet-5-5': {'input_tokens': 2.00, 'output_tokens': 10.00,
-                                'cache_creation_input_tokens': 2.50, 'cache_read_input_tokens': 0.20}}
+                                'cache_creation_input_tokens': 2.50, 'cache_read_input_tokens': 0.20},
+          # Rate card for prompts of 100K tokens or fewer; longer prompts cost 5x.
+          'claude-haiku-5-5': {'input_tokens': 0.10, 'output_tokens': 0.50,
+                               'cache_creation_input_tokens': 0.125, 'cache_read_input_tokens': 0.01}}
 USAGE_FIELDS = ('input_tokens', 'output_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens')
 SYSTEM_PROMPT = (
     'You operate a spectrum analyzer through the provided tools to perform a conducted OBUE '
@@ -51,7 +54,7 @@ _DECISION = re.compile(r'DECISION:\s*(PASS|FAIL|INVALID/INCOMPLETE)', re.I)
 def load_dotenv(path=ROOT / '.env'):
     """Set KEY=VALUE lines from .env that are not already in the environment."""
     try:
-        lines = Path(path).read_text().splitlines()
+        lines = Path(path).read_text(encoding='utf-8').splitlines()
     except FileNotFoundError:
         return
     for line in lines:
@@ -103,8 +106,8 @@ def claude_tools(mcp_tools):
             for t in mcp_tools]
 
 
-def task_prompt(case):
-    return 'Measurement task:\n```json\n' + json.dumps(public_task(case), indent=2) + '\n```'
+def task_prompt(case, instructions='standard'):
+    return 'Measurement task:\n```json\n' + json.dumps(public_task(case, instructions), indent=2) + '\n```'
 
 
 def start_session(case, condition, spectrum):
@@ -118,12 +121,12 @@ def start_session(case, condition, spectrum):
 
 
 def run_llm_session(case, condition, rep, *, client, spectrum, model=DEFAULT_MODEL, effort=DEFAULT_EFFORT,
-                    max_calls=50, max_turns=60, timeout_s=1800):
+                    instructions='standard', max_calls=50, max_turns=60, timeout_s=1800):
     """Let Claude run one session, then score it with the independent audit and reference."""
     import anthropic
     backend, interface, mcp, tools = start_session(case, condition, spectrum)
     initial_hash = backend.snapshot()
-    messages = [{'role': 'user', 'content': task_prompt(case)}]
+    messages = [{'role': 'user', 'content': task_prompt(case, instructions)}]
     usage = Counter()
     status = 'completed'
     final_text = ''
@@ -189,8 +192,8 @@ def run_llm_session(case, condition, rep, *, client, spectrum, model=DEFAULT_MOD
     matches = _DECISION.findall(final_text)
     reported = matches[-1].lower() if matches else 'unparsed'
     record = {'scenario': case.id, 'family': case.family, 'condition': condition, 'repetition': rep,
-              'actor': 'llm', 'model': model, 'effort': effort, 'scope': case.plan.scope,
-              'public_task': public_task(case),
+              'actor': 'llm', 'model': model, 'effort': effort, 'instructions': instructions,
+              'scope': case.plan.scope, 'public_task': public_task(case, instructions),
               'initial_state_hash': initial_hash, 'final_state_hash': backend.snapshot(), 'termination': status,
               'api_error': api_error, 'turns': turns,
               'calls': len(interface.calls), 'elapsed_s': time.perf_counter() - start,
@@ -238,7 +241,7 @@ def run_llm_pilot(output, sessions, *, client, **options):
         record = run_llm_session(case, condition, rep, client=client, spectrum=spectrum, **options)
         record['source_hash'] = revision
         records.append(record)
-        (out / f'{case.id}_{condition}_{rep}.json').write_text(json.dumps(record, indent=2, allow_nan=False))
+        (out / f'{case.id}_{condition}_{rep}.json').write_text(json.dumps(record, indent=2, allow_nan=False), encoding='utf-8')
         cost = record['estimated_cost_usd']
         tokens = sum(record['usage'].values())
         print(f"{record['termination']}, reported {record['reported_decision']}, "
@@ -248,11 +251,12 @@ def run_llm_pilot(output, sessions, *, client, **options):
     summary.update({'actor': 'llm', 'warning': 'Pilot-scale run; not a powered comparison.',
                     'model': records[0]['model'] if records else None,
                     'effort': records[0]['effort'] if records else None,
+                    'instructions': records[0]['instructions'] if records else None,
                     'source_hash': revision, 'order_seed': ORDER_SEED,
                     'order': [f'{c.id}/{cond}/{r}' for c, _, cond, r in sessions],
                     'usage': dict(sum((Counter(r['usage']) for r in records), Counter())),
                     'estimated_cost_usd': sum(r['estimated_cost_usd'] or 0 for r in records)})
-    (out / 'summary.json').write_text(json.dumps(summary, indent=2))
+    (out / 'summary.json').write_text(json.dumps(summary, indent=2), encoding='utf-8')
     return summary
 
 
@@ -265,6 +269,8 @@ def main():
     parser.add_argument('--repetitions', type=int, default=1)
     parser.add_argument('--model', default=DEFAULT_MODEL)
     parser.add_argument('--effort', choices=['low', 'medium', 'high', 'xhigh', 'max'], default=DEFAULT_EFFORT)
+    parser.add_argument('--instructions', choices=sorted(INSTRUCTION_VARIANTS), default='standard',
+                        help="Task wording: 'standard' (baseline) or 'neutral' (no hint to correct invalid settings).")
     parser.add_argument('--max-calls', type=int, default=50, help='Tool-call budget per session.')
     parser.add_argument('--output', default=str(ROOT / 'outputs/llm_pilot'))
     parser.add_argument('--dry-run', action='store_true', help='Print the first session prompt and tools; no API call.')
@@ -289,16 +295,18 @@ def main():
         case, spectrum, condition, _ = sessions[0]
         _, _, _, tools = start_session(case, condition, spectrum)
         print(json.dumps({'sessions': len(sessions), 'first_session': f'{case.id}/{condition}',
-                          'system': SYSTEM_PROMPT, 'user': task_prompt(case), 'tools': tools}, indent=2))
+                          'system': SYSTEM_PROMPT, 'user': task_prompt(case, args.instructions),
+                          'tools': tools}, indent=2))
         return
 
     load_dotenv()
     if not os.environ.get('ANTHROPIC_API_KEY'):
         parser.error('ANTHROPIC_API_KEY is not set; add it to .env or the environment')
     import anthropic
-    print(f'Running {len(sessions)} Claude session(s) with {args.model} (effort {args.effort}).', file=sys.stderr)
+    print(f'Running {len(sessions)} Claude session(s) with {args.model} '
+          f'(effort {args.effort}, {args.instructions} instructions).', file=sys.stderr)
     summary = run_llm_pilot(args.output, sessions, client=anthropic.Anthropic(), model=args.model,
-                            effort=args.effort, max_calls=args.max_calls)
+                            effort=args.effort, instructions=args.instructions, max_calls=args.max_calls)
     print(json.dumps({k: summary[k] for k in ('sessions', 'by_condition', 'usage', 'estimated_cost_usd')}, indent=2))
 
 

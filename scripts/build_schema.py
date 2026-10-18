@@ -31,5 +31,5 @@ schema={'$schema':'https://json-schema.org/draft/2020-12/schema','$id':'urn:ee59
     '$defs':defs,**obj({'profile_id':{'const':'n78_wa_cat_a_100m_30k_midchannel_r18'},'dut':ref('dut_state'),
         'scans':{'type':'array','minItems':1,'maxItems':100,'items':ref('scan')},
         'scope':{'const':'near_channel_nr'},'external_loss_db':{'const':40},'actual_output_power_dbm':{'const':46}})}
-(ROOT/'schemas/domain.schema.json').write_text(json.dumps(schema,indent=2)+'\n')
+(ROOT/'schemas/domain.schema.json').write_text(json.dumps(schema,indent=2)+'\n',encoding='utf-8')
 print('Generated schemas/domain.schema.json')

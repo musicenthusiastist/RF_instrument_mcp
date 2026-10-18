@@ -19,7 +19,7 @@ def main():
     fig,axes=plt.subplots(2,2,figsize=(11,7))
     for col,(model,spectrum) in enumerate(spectra.items()):
         stem=model.replace('.','_')
-        data=json.loads((directory/f'{stem}_reference.json').read_text())
+        data=json.loads((directory/f'{stem}_reference.json').read_text(encoding='utf-8'))
         raw=np.fromfile(directory/f'{stem}_iq_f32.bin',dtype='<f4').reshape(-1,2).astype(float)
         power=raw[:,0]**2+raw[:,1]**2
         fs=data['sample_rate_hz']; block=round(fs*1e-5); count=len(power)//block

@@ -83,6 +83,8 @@ def summarize(records):
             'interception': _ratio(total('invalid_interceptions'), total('invalid_attempts')),
             'false_block': _ratio(total('false_blocks'), total('valid_attempts')),
             'eligible_completion': _ratio(total('eligible_complete'), len(rows)),
-            'decision_error': _ratio(sum(r['decision_error'] is True for r in rows), total('decision_supported')),
+            # Denominator: sessions that reported pass/fail (decision_error is None otherwise).
+            'decision_error': _ratio(sum(r['decision_error'] is True for r in rows),
+                                     sum(r['decision_error'] is not None for r in rows)),
             'adapter_errors': total('adapter_errors')}
     return result

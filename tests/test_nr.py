@@ -66,7 +66,7 @@ class NRTests(unittest.TestCase):
             outputs.append(values)
         self.assertEqual(outputs[0], outputs[1])
         self.assertEqual(outputs[1], outputs[2])
-        reference = json.loads((self.directory / 'NR-FR1-TM1_1_reference.json').read_text())
+        reference = json.loads((self.directory / 'NR-FR1-TM1_1_reference.json').read_text(encoding='utf-8'))
         for actual, power in zip(outputs[0], reference['matlab_power_mw'][:50]):
             self.assertLessEqual(abs(actual - 10 * log10(power)), .10)
 
@@ -119,7 +119,7 @@ class NRTests(unittest.TestCase):
         import numpy as np
         for specification in NR_BENCHMARK['cases']:
             directory = ROOT / 'outputs/nr_cases' / specification['id']
-            manifest = json.loads((directory / 'case.json').read_text())
+            manifest = json.loads((directory / 'case.json').read_text(encoding='utf-8'))
             for model in manifest['models']:
                 stem = model['model'].replace('.', '_')
                 original = np.fromfile(self.directory / f'{stem}_iq_f32.bin', dtype='<f4').reshape(-1, 2)

@@ -16,7 +16,7 @@ from obue.simulator import Analyzer
 class SchemaTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.schema=json.loads((ROOT/'schemas/domain.schema.json').read_text())
+        cls.schema=json.loads((ROOT/'schemas/domain.schema.json').read_text(encoding='utf-8'))
         Draft202012Validator.check_schema(cls.schema)
         cls.validator=Draft202012Validator(cls.schema,format_checker=FormatChecker())
 

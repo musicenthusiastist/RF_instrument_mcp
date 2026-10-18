@@ -8,6 +8,12 @@ JSON tools (B), or RF-aware tools (C). No hardware is connected.
 
 Run from this directory with Python 3.10 or newer:
 
+Activate the venv in any new terminal.
+
+```bash
+.\.venv\Scripts\Activate.ps1
+```
+
 ```bash
 python -m pip install -e ".[test,reference,llm]"
 python scripts/verify_all.py

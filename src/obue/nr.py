@@ -7,7 +7,7 @@ from .domain import TestModel
 from .spectrum import Spectrum
 from .config import ROOT
 
-NR_BENCHMARK = json.loads((ROOT / 'requirements/nr_benchmark.json').read_text())
+NR_BENCHMARK = json.loads((ROOT / 'requirements/nr_benchmark.json').read_text(encoding='utf-8'))
 FFT_LENGTH = 16384
 
 
@@ -32,7 +32,7 @@ def iq_hashes(directory, models):
 
 
 def _read_metadata(directory, model):
-    return json.loads((Path(directory) / f'{_stem(model)}_reference.json').read_text())
+    return json.loads((Path(directory) / f'{_stem(model)}_reference.json').read_text(encoding='utf-8'))
 
 
 def load_nr_spectra(directory):

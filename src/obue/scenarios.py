@@ -25,12 +25,17 @@ SETTING_PROBES = [
     ('Span misses measurement regions', {'span': {'value': 100, 'unit': 'MHz'}}, 'PROC-004'),
 ]
 
-INSTRUCTIONS = (
-    'Inspect the plan and proposed settings. Correct invalid settings and acquire the required scans. '
+_DECISION_RULES = (
     'PASS requires complete valid coverage and all powers at or below their limits. '
     'One valid above-limit reading supports FAIL; otherwise report INVALID/INCOMPLETE. '
     'Returned powers are already corrected to the transmitter plane. '
     'Calibration is assumed valid; uncertainty is excluded.')
+# 'standard' is the baseline wording; 'neutral' drops the hint to correct invalid settings.
+INSTRUCTION_VARIANTS = {
+    'standard': ('Inspect the plan and proposed settings. Correct invalid settings and acquire the required scans. '
+                 + _DECISION_RULES),
+    'neutral': 'Inspect the plan. Acquire the required scans. ' + _DECISION_RULES,
+}
 
 
 @dataclass(frozen=True)
@@ -57,13 +62,13 @@ def scenarios():
     return cases
 
 
-def public_task(case):
+def public_task(case, instructions='standard'):
     """Condition-independent controller input; excludes private scenario labels."""
     near_channel_regions = [r for r in RULES['obue_mask']['regions'] if r['id'] != 'far_flat']
     return {
         'id': case.id,
         'task': 'Measure both test models over the declared grid and report a supported decision.',
-        'instructions': INSTRUCTIONS,
+        'instructions': INSTRUCTION_VARIANTS[instructions],
         'proposed_settings': json.loads(json.dumps(case.probe)),  # deep copy
         'proposed_scan_index': 0,
         'plan': plan_to_dict(case.plan),
