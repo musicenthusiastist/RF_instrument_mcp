@@ -136,10 +136,7 @@ Profile and limits are in requirements/obue_rules.json.
 
 ## Reproducibility and figures
 
-Measurement seeds have been removed because readings are deterministic. A fixed
-random seed still controls scripted pilot execution order and is recorded once
-in its summary. MATLAB also fixes waveform-generation randomness. Source hashes
-identify saved runs; full traces are retained for independent auditing.
+Source hashes identify saved runs; full traces are retained for independent auditing.
 
 ```powershell
 python -m obue export-plan --output examples
@@ -148,6 +145,5 @@ python scripts/plot_nominal_obue.py
 python scripts/plot_reference_verification.py
 ```
 
-Plotting requires matplotlib. Figure 4 uses the current analytical demo. Figure 5
-compares the saved analytical Python/MATLAB integration reports. NR verification
+Plotting requires matplotlib. NR verification
 is recorded separately in outputs/nr_reference/verification.json.
