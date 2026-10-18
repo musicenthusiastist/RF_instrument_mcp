@@ -34,12 +34,11 @@ class PlanTests(unittest.TestCase):
                   replace_scan(self.plan,0,region=replace(self.plan.scans[0].region,measurement_bandwidth=Quantity(1,Unit.MHZ)))):
             self.assertIn('PROC-004',self.rules(p))
 
-    def test_missing_test_model(self):self.assertIn('PROC-005',self.rules(replace(self.plan,scans=self.plan.scans[:6])))
+    def test_missing_test_model(self):self.assertIn('PROC-005',self.rules(replace(self.plan,scans=self.plan.scans[:4])))
     def test_nr_grid_and_fixed_loss(self):
-        p=default_plan('near_channel_nr')
-        self.assertEqual(validate_plan(p),[])
-        self.assertEqual(len(p.scans),8)
+        self.assertEqual(len(self.plan.scans),8)
         self.assertIn('SAFE-001',self.rules(replace(self.plan,external_loss_db=41)))
+    def test_unknown_scope(self):self.assertIn('SCOPE-003',self.rules(replace(self.plan,scope='full_analytical')))
 
     def test_overload(self):
         for p in (self.state(preamp_enabled=True),self.state(attenuation=Quantity(0,Unit.DB))):

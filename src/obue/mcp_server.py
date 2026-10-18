@@ -7,15 +7,15 @@ import argparse
 import json
 import sys
 
-from .interfaces import Interface
-from .plan import default_plan, plan_from_dict
-from .simulator import Analyzer
-from .spectrum import make_obue_fixture
-from .scenarios import scenarios
 from .config import ROOT
+from .interfaces import Interface
+from .nr import load_nr_spectra, nr_directory
+from .plan import default_plan
+from .scenarios import scenarios
+from .simulator import Analyzer
 
 PROTOCOL_VERSIONS = ('2025-03-26', '2025-06-18', '2025-11-25')
-SERVER_INFO = {'name': 'fsva3000-obue-simulator', 'version': '0.4.0'}
+SERVER_INFO = {'name': 'fsva3000-obue-simulator', 'version': '0.5.0'}
 
 
 class Server:
@@ -73,42 +73,16 @@ class Server:
 
 
 def main():
-    from .nr import nr_scenarios
-    parser = argparse.ArgumentParser(description='R&S FSVA3000 analytical simulator over stdio MCP; no hardware or LLM.')
+    parser = argparse.ArgumentParser(description='R&S FSVA3000 NR simulator over stdio MCP; no hardware or LLM.')
     parser.add_argument('--condition', choices=['A', 'B', 'C'], default='C')
-    setup = parser.add_mutually_exclusive_group()
-    setup.add_argument('--plan', help='Initial public measurement plan JSON; nominal analytical spectrum.')
-    setup.add_argument('--scenario', choices=sorted({s.id for s in scenarios() + nr_scenarios()}),
-                       help='Scenario selected by the external harness.')
-    parser.add_argument('--signal', choices=['analytical', 'nr'], default='analytical')
+    parser.add_argument('--scenario', choices=[s.id for s in scenarios()],
+                        help='Selects the input signal: R01-R04 use controlled tone IQ; '
+                             'others (or none) use the clean NR records.')
     parser.add_argument('--nr-directory', default=str(ROOT / 'outputs/nr_reference'))
     args = parser.parse_args()
 
-    margin = 3.0
-    if args.scenario:
-        # With NR input, N01 is the clean-baseline case.
-        cases = nr_scenarios() + [scenarios()[0]] if args.signal == 'nr' else scenarios()
-        matches = [c for c in cases if c.id == args.scenario]
-        if not matches:
-            parser.error('Scenario is not available for this signal input')
-        plan = matches[0].plan
-        margin = matches[0].margin_db
-    elif args.plan:
-        with open(args.plan, encoding='utf-8') as stream:
-            plan = plan_from_dict(json.load(stream))
-    else:
-        plan = default_plan()
-
-    if args.signal == 'nr':
-        if args.plan:
-            parser.error('NR input uses its fixed reduced grid; omit --plan')
-        from .nr import load_nr_spectra, nr_directory
-        plan = default_plan('near_channel_nr')
-        spectrum = load_nr_spectra(nr_directory(args.nr_directory, args.scenario))
-    else:
-        spectrum = make_obue_fixture(margin)
-
-    server = Server(Interface(Analyzer(plan, spectrum), args.condition))
+    spectrum = load_nr_spectra(nr_directory(args.nr_directory, args.scenario))
+    server = Server(Interface(Analyzer(default_plan(), spectrum), args.condition))
     for line in sys.stdin:
         try:
             request = json.loads(line)

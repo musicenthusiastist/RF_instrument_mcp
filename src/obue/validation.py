@@ -7,7 +7,7 @@ from .config import CAPABILITY, RULES
 from .domain import AveragingDomain, Detector, TestModel, Unit, filter_center_hz
 from .plan import Plan
 
-SCOPES = ('full_analytical', 'near_channel_nr')
+SCOPE = 'near_channel_nr'
 SIDES = ('lower', 'upper')
 MAX_FILTERS_PER_SCAN = 2000
 REGION_FIELDS = ('start_offset', 'stop_offset', 'step', 'measurement_bandwidth')
@@ -58,10 +58,10 @@ def validate_plan(plan: Plan, *, scan_index: int | None = None) -> list[Violatio
     if plan.actual_output_power_dbm != 46:
         check.fail('PROC-003', 'actual_output_power_dbm', 'DUT is not at declared rated power')
     loss = check.number(plan.external_loss_db, 'SAFE-001', 'external_loss_db', minimum=40, maximum=40)
-    if plan.scope not in SCOPES:
+    if plan.scope != SCOPE:
         check.fail('SCOPE-003', 'scope', 'unknown measurement scope')
 
-    expected = _expected_filters(plan.scope)
+    expected = _expected_filters()
     actual = Counter()
     power_known = loss is not None and actual_power is not None
     indices = range(len(plan.scans)) if scan_index is None else [scan_index]
@@ -95,13 +95,13 @@ def _check_profile(plan, check):
         check.fail('PROC-003', 'dut.test_model', 'unsupported test model')
 
 
-def _expected_filters(scope):
-    """Count of each (model, side, offset, bandwidth) filter that full coverage requires."""
+def _expected_filters():
+    """Count of each (model, side, offset, bandwidth) filter that the near-channel grid requires."""
     expected = Counter()
     for tm in TestModel:
         for side in SIDES:
             for region in RULES['obue_mask']['regions']:
-                if scope == 'near_channel_nr' and region['id'] == 'far_flat':
+                if region['id'] == 'far_flat':
                     continue
                 for offset in range(region['centre_offset_start_hz'], region['centre_offset_stop_exclusive_hz'],
                                     region['centre_step_hz']):

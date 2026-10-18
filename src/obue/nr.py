@@ -11,18 +11,6 @@ NR_BENCHMARK = json.loads((ROOT / 'requirements/nr_benchmark.json').read_text())
 FFT_LENGTH = 16384
 
 
-def nr_scenarios():
-    """Controlled tone cases R01-R04, then the unit/setting probes on the reduced NR plan."""
-    from dataclasses import replace
-    from .plan import default_plan
-    from .scenarios import Scenario, scenarios
-    plan = default_plan('near_channel_nr')
-    controlled = [Scenario(c['id'], 'nr_emission', 'Measure the declared NR grid.', 0, plan, {})
-                  for c in NR_BENCHMARK['cases']]
-    settings = [replace(c, plan=plan) for c in scenarios() if c.id in NR_BENCHMARK['setting_cases']]
-    return controlled + settings
-
-
 def nr_directory(base_directory, scenario_id):
     """Controlled cases live in a sibling nr_cases/<id> folder; all others use the clean records."""
     if scenario_id in {c['id'] for c in NR_BENCHMARK['cases']}:

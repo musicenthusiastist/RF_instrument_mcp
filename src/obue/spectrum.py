@@ -1,7 +1,6 @@
 """Piecewise constant PSD (mW/Hz) plus ideal tones (mW).
 
-Measurement filters are rectangular with ENBW equal to their width. These are
-analytical fixtures, not generated NR test-model waveforms.
+Measurement filters are rectangular with ENBW equal to their width.
 """
 from bisect import bisect_left
 from dataclasses import dataclass
@@ -54,27 +53,3 @@ class Spectrum:
             total += self.psd_mw_hz[i] * max(0, min(b, high) - max(a, low))
         return total + sum(p for f, p in self.tones if low <= f < high)
 
-
-def make_obue_fixture(margin_db=3.0):
-    """Manufactured PSD: every nominal filter power equals its limit minus margin.
-
-    This construction is useful for regression tests, not a realistic NR spectrum.
-    The carrier is represented by a flat 100 MHz PSD at 46 dBm total power.
-    """
-    from .domain import (CHANNEL_LOWER_EDGE_HZ, CHANNEL_UPPER_EDGE_HZ, expected_obue_offsets_hz,
-                         filter_center_hz, obue_limit_dbm, obue_measurement_bandwidth_hz)
-
-    # (low edge, high edge, density) for every filter, plus the carrier itself.
-    segments = []
-    for side in ('lower', 'upper'):
-        for offset in expected_obue_offsets_hz():
-            bw = obue_measurement_bandwidth_hz(offset)
-            center = filter_center_hz(side, offset)
-            density = dbm_to_mw(obue_limit_dbm(offset) - margin_db) / bw
-            segments.append((center - bw / 2, center + bw / 2, density))
-    segments.append((CHANNEL_LOWER_EDGE_HZ, CHANNEL_UPPER_EDGE_HZ, dbm_to_mw(46) / 100e6))
-    segments.sort()
-    if any(a[1] != b[0] for a, b in zip(segments, segments[1:])):
-        raise ValueError('fixture gap')
-    edges = [s[0] for s in segments] + [segments[-1][1]]
-    return Spectrum(tuple(edges), tuple(s[2] for s in segments))

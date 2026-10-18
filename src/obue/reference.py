@@ -8,8 +8,7 @@ from math import log10
 
 MODELS = ('NR-FR1-TM1.1', 'NR-FR1-TM1.2')
 # (first centre offset, stop offset exclusive, step, filter bandwidth) in Hz.
-NEAR_REGIONS = ((50000, 5050000, 100000, 100000), (5050000, 10050000, 100000, 100000))
-FAR_REGION = (10500000, 240000000, 1000000, 1000000)
+REGIONS = ((50000, 5050000, 100000, 100000), (5050000, 10050000, 100000, 100000))
 
 
 def reference_power_mw(spectrum, low, high):
@@ -49,16 +48,13 @@ def aggregate(decisions):
     return 'fail' if 'fail' in values else 'pass'
 
 
-def evaluate_reference(spectrum, plan=None):
-    """Ideal per-filter powers and the true overall decision for the plan's scope."""
-    from .plan import default_plan
-    plan = default_plan() if plan is None else plan
-    regions = NEAR_REGIONS + ((FAR_REGION,) if plan.scope == 'full_analytical' else ())
+def evaluate_reference(spectra):
+    """Ideal per-filter powers and the true overall decision on the near-channel grid."""
     rows = []
     for model in MODELS:
-        source = spectrum[model] if isinstance(spectrum, dict) else spectrum
+        source = spectra[model]
         for side in ('lower', 'upper'):
-            for start, stop, step, bw in regions:
+            for start, stop, step, bw in REGIONS:
                 for offset in range(start, stop, step):
                     center = 3500e6 - offset if side == 'lower' else 3600e6 + offset
                     power = 10 * log10(reference_power_mw(source, center - bw / 2, center + bw / 2))

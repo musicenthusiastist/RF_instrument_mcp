@@ -6,9 +6,7 @@
         "-m",
         "obue.mcp_server",
         "--condition",
-        "C",
-        "--scenario",
-        "N01"
+        "C"
       ],
       "env": {
         "PYTHONPATH": "/Users/xiranz./Documents/EE594_MasterThesis/week1_obue/src",

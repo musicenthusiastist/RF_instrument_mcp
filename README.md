@@ -1,37 +1,47 @@
 # OBUE simulation benchmark
 
-Compare raw SCPI (A), primitive JSON tools (B), and RF-aware tools (C) on one
-deterministic analyzer simulator. No hardware or LLM is connected yet.
+Claude controls a simulated R&S FSVA3000 through one of three interfaces and
+measures NR OBUE on MATLAB-generated TM1.1/TM1.2 IQ: raw SCPI (A), primitive
+JSON tools (B), or RF-aware tools (C). No hardware is connected.
 
 ## Setup
 
 Run from this directory with Python 3.10 or newer:
 
-```powershell
-python -m pip install -e ".[test,reference]"
+```bash
+python -m pip install -e ".[test,reference,llm]"
 python scripts/verify_all.py
 ```
 
-## Run
+The tests and the simulator read the IQ records in `outputs/nr_reference` and
+`outputs/nr_cases`. These are git-ignored; keep a backup or regenerate them in
+MATLAB (see below).
 
-```powershell
-# Known analytical spectrum, full 1320-window grid
-python -m obue demo --output outputs/demo_current
+## Claude sessions
 
-# Separate MATLAB-generated TM1.1/TM1.2 IQ, reduced 400-window grid
-python -m obue demo --signal nr --output outputs/demo_nr
-python scripts/check_nr_references.py
+The harness gives Claude the public task and the MCP tools for one condition,
+then scores the session with an independent audit, the evidence rule and a
+private reference that Claude never sees. Claude must end with `DECISION: PASS`,
+`FAIL` or `INVALID/INCOMPLETE`; anything else is recorded as `unparsed`.
 
-# Controlled near-limit failure; R01/R02 pass, R03/R04 fail
-python -m obue demo --signal nr --scenario R03 --output outputs/demo_nr_R03
-python -m obue pilot --signal nr --output outputs/nr_pilot
-
-# 18 analytical scenarios across A/B/C; scripted integration only
-python -m obue pilot --output outputs/scripted_pilot
+```bash
+# Put ANTHROPIC_API_KEY=... in .env (git-ignored); the harness loads it.
+python -m obue.llm_harness --all --dry-run                   # prompt and tools; no API call
+python -m obue.llm_harness --scenario R03 --condition C      # one paid session
+python -m obue.llm_harness --scenario S01                    # one scenario under A, B and C
+python -m obue.llm_harness --all --output outputs/llm_pilot  # 16 scenarios × A/B/C = 48 sessions
 ```
 
-The terminal prints a compact summary. The saved deterministic_demo.json contains
-the public task, measurement responses, state changes, and audit results.
+Defaults: claude-opus-5-5, effort low (fewest tokens; try `--effort medium`
+if decisions look careless), 50 tool calls per session. `--model claude-sonnet-5-5`
+halves the per-token price. When a budget runs out, Claude gets one final turn
+without tools to report its decision. Each session JSON keeps the full
+conversation, token usage and an estimated cost. Records add `evidence_decision`
+(what the valid acquired readings support) next to Claude's `reported_decision`.
+Refusals and API errors are recorded as terminations; no fallback model is used,
+so every session is the named model. B/C acquisition responses are much larger
+than A's comma-separated traces (about 29k versus 3k tokens for all 8 scans), so
+context size differs by condition.
 
 ## Measurement contract
 
@@ -44,10 +54,8 @@ the public task, measurement responses, state changes, and audit results.
 - C checks physical units, exact region RBW, RMS detection, power averaging,
   span coverage, and modeled input/mixer/reference-level headroom.
 - Valid calculations integrate rectangular filters in linear power. Detector,
-  averaging, and overload effects on invalid baseline acquisitions are declared
-  study assumptions, not vendor performance or hardware protection guarantees.
-- There are six nominal margin cases, six unit/scalar cases, and six RF-setting
-  cases. No calibration-expiry or uncertainty scenarios remain.
+  averaging, and overload effects on invalid acquisitions are declared study
+  assumptions, not vendor performance or hardware protection guarantees.
 
 ## NR input
 
@@ -59,9 +67,11 @@ excluded and recorded in the reference metadata. The first slot is normalized
 to 46 dBm. No additional transient exclusion or PA model is applied.
 
 The frozen reduced grid covers 100 kHz filters within 10 MHz of both channel edges:
-8 scans, 200 windows per model, 400 total. It is not full OBUE coverage. Unsupported
-spectrum is rejected rather than padded with zero emissions. The waveform
-generator records its own configured release; the current records use 17.8.0.
+2 models × 2 sides × 2 regions = 8 scans, 200 windows per model, 400 total. The
+far region (10.5–240 MHz offsets) is excluded because the sampled bandwidth only
+reaches about ±61 MHz around the carrier, so this is not full OBUE coverage.
+Unsupported spectrum is rejected rather than padded with zero emissions. The
+waveform generator records its own configured release; the current records use 17.8.0.
 
 MATLAB can recalculate independent references from the existing IQ without
 regenerating the waveforms:
@@ -77,9 +87,19 @@ reference check afterward.
 
 ## Frozen NR scenarios
 
-requirements/nr_benchmark.json fixes the grid and scenario list. Four controlled
-IQ cases add tones at 3492.95 and 3607.05 MHz to each model's first DL slot.
-The target is total integrated power, including the original NR emissions:
+requirements/nr_benchmark.json fixes the grid and scenario list. All 16
+scenarios use the same correct plan; only the input signal and the proposed
+settings in the public task differ.
+
+| Scenarios | Signal | Proposed settings | Reference decision |
+| --- | --- | --- | --- |
+| R01–R04 | clean NR plus calibrated tones | none | R01/R02 PASS, R03/R04 FAIL |
+| U01–U06 | clean NR | one unit/scalar error (e.g. RBW in dBm) | PASS |
+| S01–S06 | clean NR | one RF-setting error (e.g. peak detector) | PASS |
+
+The four controlled IQ cases add tones at 3492.95 and 3607.05 MHz to each model's
+first DL slot. The target is total integrated power, including the original NR
+emissions:
 
 | Case | Target margin below the limit | Expected decision |
 | --- | --- | --- |
@@ -100,30 +120,27 @@ addpath('matlab');
 export_nr_cases;
 ```
 
-The NR pilot uses four emission cases plus six unit/scalar and six RF-setting
-cases on clean NR input: 16 scenarios, 48 A/B/C sessions per repetition. N01 is
-an optional clean demonstration. All outcomes refer to the reduced grid.
 Tools never return target margins or expected labels.
 
-```powershell
+```bash
 python scripts/check_nr_references.py
 python scripts/plot_nr_cases.py
+python scripts/plot_nr_input.py
 ```
 
 ## MCP server
 
-```powershell
-python -m obue.mcp_server --condition C --scenario N01
-python -m obue.mcp_server --condition C --signal nr
-python -m obue.mcp_server --condition C --signal nr --scenario R03
+```bash
+python -m obue.mcp_server --condition C                 # clean NR signal
+python -m obue.mcp_server --condition C --scenario R03  # controlled tone case
 ```
 
 The server waits for newline-delimited JSON-RPC requests on stdin. It prints no
 startup banner. Initialize, notify initialized, list tools, and then call them.
 B/C expose get_state, configure_scan, and acquire. A exposes execute_scpi.
 Only one interface is active per process. Tool responses never include the
-private reference decision. The NR server uses its fixed reduced plan and supports
-R01–R04, U01–U06, S01–S06, and the optional clean N01 baseline. Restart to reset state.
+private reference decision. `--scenario` only selects the input signal; the
+proposed settings live in the public task. Restart to reset state.
 
 A supports FREQ:CENT, FREQ:SPAN, BAND:RES, BAND:VID, INP:ATT,
 DISP:TRAC:Y:RLEV, INP:GAIN:STAT, DET, AVER:TYPE and setting queries.
@@ -134,16 +151,9 @@ contains study filter powers; the simulator does not emulate a vendor display.
 Capability sources and modeling assumptions are in requirements/analyzer_capability.json.
 Profile and limits are in requirements/obue_rules.json.
 
-## Reproducibility and figures
+## Reproducibility
 
-Source hashes identify saved runs; full traces are retained for independent auditing.
-
-```powershell
-python -m obue export-plan --output examples
-python -m obue scenarios --output scenarios
-python scripts/plot_nominal_obue.py
-python scripts/plot_reference_verification.py
-```
-
-Plotting requires matplotlib. NR verification
-is recorded separately in outputs/nr_reference/verification.json.
+Source hashes identify saved runs; full traces are retained for independent
+auditing. A fixed seed sets the session order. Plotting requires matplotlib.
+NR verification is recorded in outputs/nr_reference/verification.json.
+`python scripts/build_schema.py` regenerates schemas/domain.schema.json.

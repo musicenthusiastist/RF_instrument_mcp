@@ -8,9 +8,9 @@ try:
     from jsonschema import Draft202012Validator,FormatChecker
 except ImportError:
     raise ImportError('Schema tests require the optional test dependency: python -m pip install jsonschema')
+from obue.nr import load_nr_spectra
 from obue.plan import default_plan,plan_to_dict
 from obue.simulator import Analyzer
-from obue.spectrum import make_obue_fixture
 
 
 class SchemaTests(unittest.TestCase):
@@ -31,7 +31,7 @@ class SchemaTests(unittest.TestCase):
     def test_structured_measurement_result(self):
         schema={'$schema':self.schema['$schema'],'$defs':self.schema['$defs'],'$ref':'#/$defs/measurement_result'}
         v=Draft202012Validator(schema)
-        result=Analyzer(default_plan(),make_obue_fixture()).acquire(0,enforce=True)
+        result=Analyzer(default_plan(),load_nr_spectra(ROOT/'outputs/nr_reference')).acquire(0,enforce=True)
         v.validate(result)
         del result['reference_plane'];self.assertTrue(list(v.iter_errors(result)))
 

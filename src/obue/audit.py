@@ -27,7 +27,7 @@ def audit_plan(data, scan_index=None):
 
     try:
         _audit_profile(data, add)
-        expected = _expected_filters(data['scope'])
+        expected = _expected_filters()
         actual = Counter()
         scans = data['scans'] if scan_index is None else [data['scans'][scan_index]]
         for scan in scans:
@@ -71,19 +71,17 @@ def _audit_profile(data, add):
         add('PROC-003')
     if data['external_loss_db'] != 40:
         add('SAFE-001')
-    if data['scope'] not in ('full_analytical', 'near_channel_nr'):
+    if data['scope'] != 'near_channel_nr':
         add('SCOPE-003')
 
 
-def _expected_filters(scope):
-    """Four combinations of model and side, with 330 (or 100 near-channel) positions each."""
-    near = [50000 + 100000 * j for j in range(100)]
-    far = [10500000 + 1000000 * j for j in range(230)] if scope == 'full_analytical' else []
+def _expected_filters():
+    """Four combinations of model and side, with 100 near-channel 100 kHz positions each."""
     expected = Counter()
     for model in MODELS:
         for side in SIDES:
-            for offset in near + far:
-                expected[(model, side, offset, 100000 if offset < 10000000 else 1000000)] += 1
+            for offset in range(50000, 10050000, 100000):
+                expected[(model, side, offset, 100000)] += 1
     return expected
 
 

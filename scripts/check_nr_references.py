@@ -17,9 +17,8 @@ for case in NR_BENCHMARK['cases']:
     result=verify_nr(directory)
     (directory/'verification.json').write_text(json.dumps(result,indent=2)+'\n')
     from obue.reference import evaluate_reference
-    from obue.plan import default_plan
     from obue.nr import load_nr_spectra
-    reference=evaluate_reference(load_nr_spectra(directory),default_plan('near_channel_nr'))
+    reference=evaluate_reference(load_nr_spectra(directory))
     margin=min(r['limit_dbm']-r['power_dbm'] for r in reference['rows'])
     if reference['decision']!=case['expected_decision'] or abs(margin-case['target_margin_db'])>NR_BENCHMARK['target_tolerance_db']:
         raise AssertionError('Controlled NR case does not meet its frozen target')

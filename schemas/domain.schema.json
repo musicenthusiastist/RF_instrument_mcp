@@ -321,10 +321,7 @@
       }
     },
     "scope": {
-      "enum": [
-        "full_analytical",
-        "near_channel_nr"
-      ]
+      "const": "near_channel_nr"
     },
     "external_loss_db": {
       "const": 40

@@ -18,11 +18,11 @@ MAX_FILTERS_PER_SCAN = 2000
 
 class Analyzer:
     def __init__(self, plan, spectrum):
-        if isinstance(spectrum, dict) and plan.scope != 'near_channel_nr':
-            raise ValueError('NR spectra require the reduced near-channel plan')
+        if not isinstance(spectrum, dict) or not {s.test_model.value for s in plan.scans} <= set(spectrum):
+            raise ValueError('spectrum must map every test model in the plan to its NR Spectrum')
         self.initial_plan = plan
         self.plan = plan
-        self.spectrum = spectrum  # one Spectrum, or {test model: Spectrum} for NR
+        self.spectrum = spectrum  # {test model: Spectrum}
         self.events = []          # every configure/acquire attempt, executed or not
         self.results = {}         # scan index -> latest acquisition
         self.revision = 0
@@ -105,7 +105,7 @@ class Analyzer:
         center_frequency = settings.center_frequency.to(Unit.HZ).value
         half_span = settings.span.to(Unit.HZ).value / 2
         span_low, span_high = center_frequency - half_span, center_frequency + half_span
-        spectrum = self.spectrum[scan.test_model.value] if isinstance(self.spectrum, dict) else self.spectrum
+        spectrum = self.spectrum[scan.test_model.value]
 
         readings = []
         for offset in range(int(start), int(stop), int(step)):
