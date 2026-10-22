@@ -100,6 +100,14 @@ class LlmHarnessTests(unittest.TestCase):
         self.assertEqual(client.requests[1]['tool_choice'], {'type': 'none'})
         self.assertEqual(client.requests[1]['messages'][-1]['content'][2]['content'], 'call budget exhausted')
 
+    def test_effort_is_omitted_for_models_without_it(self):
+        for model, expected in (('claude-opus-5-5', {'effort': 'low'}), ('claude-haiku-4-5', None)):
+            client = FakeClient([response([text('DECISION: INVALID/INCOMPLETE')], 'end_turn')])
+            record = self.run_session(self.case, 'C', 0, client=client, model=model, effort='low')
+            self.assertEqual(client.requests[0].get('output_config'), expected)
+            self.assertEqual(record['effort'], expected and 'low')
+            self.assertIsNotNone(record['estimated_cost_usd'])
+
     def test_unparsed_answer_is_not_scored_as_a_decision(self):
         client = FakeClient([response([text('I think it passes.')], 'end_turn')])
         record = self.run_session(self.case, 'A', 0, client=client)

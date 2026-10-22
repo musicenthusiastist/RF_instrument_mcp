@@ -25,7 +25,7 @@ from .mcp_server import PROTOCOL_VERSIONS, Server
 from .nr import load_nr_spectra, nr_directory as case_directory
 from .plan import plan_to_dict
 from .reference import evaluate_reference
-from .scenarios import INSTRUCTION_VARIANTS, public_task, scenarios
+from .scenarios import INSTRUCTION_VARIANTS, START_STATES, initial_plan, public_task, scenarios
 from .scoring import (ORDER_SEED, audit_events, event_counts, evidence_decision, source_hash, summarize,
                       valid_readings)
 from .simulator import Analyzer
@@ -40,7 +40,11 @@ PRICES = {'claude-opus-5-5': {'input_tokens': 4.00, 'output_tokens': 20.00,
                                 'cache_creation_input_tokens': 2.50, 'cache_read_input_tokens': 0.20},
           # Rate card for prompts of 100K tokens or fewer; longer prompts cost 5x.
           'claude-haiku-5-5': {'input_tokens': 0.10, 'output_tokens': 0.50,
-                               'cache_creation_input_tokens': 0.125, 'cache_read_input_tokens': 0.01}}
+                               'cache_creation_input_tokens': 0.125, 'cache_read_input_tokens': 0.01},
+          'claude-haiku-4-5': {'input_tokens': 1.00, 'output_tokens': 5.00,
+                               'cache_creation_input_tokens': 1.25, 'cache_read_input_tokens': 0.10}}
+# Models without the effort parameter (sending output_config.effort returns a 400); they run without thinking.
+NO_EFFORT_MODELS = {'claude-haiku-4-5'}
 USAGE_FIELDS = ('input_tokens', 'output_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens')
 SYSTEM_PROMPT = (
     'You operate a spectrum analyzer through the provided tools to perform a conducted OBUE '
@@ -66,12 +70,12 @@ def load_dotenv(path=ROOT / '.env'):
         os.environ.setdefault(key, value.strip().strip('\'"'))
 
 
-def load_cases(nr_directory=None):
+def load_cases(nr_directory=None, start_state='proposed'):
     """Return [(scenario, NR spectra)] in frozen order; each IQ directory loads once."""
     base = Path(nr_directory or ROOT / 'outputs/nr_reference')
     loaded = {}
     cases = []
-    for case in scenarios():
+    for case in scenarios(start_state):
         path = case_directory(base, case.id)
         if path not in loaded:
             loaded[path] = load_nr_spectra(path)
@@ -106,13 +110,14 @@ def claude_tools(mcp_tools):
             for t in mcp_tools]
 
 
-def task_prompt(case, instructions='standard'):
-    return 'Measurement task:\n```json\n' + json.dumps(public_task(case, instructions), indent=2) + '\n```'
+def task_prompt(case, instructions='standard', start_state='proposed'):
+    task = public_task(case, instructions, start_state)
+    return 'Measurement task:\n```json\n' + json.dumps(task, indent=2) + '\n```'
 
 
-def start_session(case, condition, spectrum):
+def start_session(case, condition, spectrum, start_state='proposed'):
     """Return (backend, interface, mcp client, Claude tool list) for a fresh session."""
-    backend = Analyzer(case.plan, spectrum)
+    backend = Analyzer(initial_plan(case, start_state), spectrum)
     interface = Interface(backend, condition)
     mcp = _McpClient(Server(interface))
     mcp.request('initialize', {'protocolVersion': PROTOCOL_VERSIONS[-1]})
@@ -121,18 +126,21 @@ def start_session(case, condition, spectrum):
 
 
 def run_llm_session(case, condition, rep, *, client, spectrum, model=DEFAULT_MODEL, effort=DEFAULT_EFFORT,
-                    instructions='standard', max_calls=50, max_turns=60, timeout_s=1800):
+                    instructions='standard', start_state='proposed', max_calls=50, max_turns=60, timeout_s=1800):
     """Let Claude run one session, then score it with the independent audit and reference."""
     import anthropic
-    backend, interface, mcp, tools = start_session(case, condition, spectrum)
+    backend, interface, mcp, tools = start_session(case, condition, spectrum, start_state)
     initial_hash = backend.snapshot()
-    messages = [{'role': 'user', 'content': task_prompt(case, instructions)}]
+    messages = [{'role': 'user', 'content': task_prompt(case, instructions, start_state)}]
     usage = Counter()
     status = 'completed'
     final_text = ''
     api_error = None
     tool_calls = 0
     turns = 0
+    if model in NO_EFFORT_MODELS:
+        effort = None
+    effort_options = {} if effort is None else {'output_config': {'effort': effort}}
     start = time.perf_counter()
 
     while True:
@@ -143,8 +151,7 @@ def run_llm_session(case, condition, rep, *, client, spectrum, model=DEFAULT_MOD
             response = client.messages.create(
                 model=model, max_tokens=16000, system=SYSTEM_PROMPT, tools=tools,
                 tool_choice={'type': 'none' if answer_only else 'auto'},
-                output_config={'effort': effort}, cache_control={'type': 'ephemeral'},
-                messages=messages)
+                cache_control={'type': 'ephemeral'}, messages=messages, **effort_options)
         except (anthropic.APIStatusError, anthropic.APIConnectionError) as exc:
             status = 'api_error'
             api_error = str(exc)
@@ -193,7 +200,8 @@ def run_llm_session(case, condition, rep, *, client, spectrum, model=DEFAULT_MOD
     reported = matches[-1].lower() if matches else 'unparsed'
     record = {'scenario': case.id, 'family': case.family, 'condition': condition, 'repetition': rep,
               'actor': 'llm', 'model': model, 'effort': effort, 'instructions': instructions,
-              'scope': case.plan.scope, 'public_task': public_task(case, instructions),
+              'start_state': start_state, 'scope': case.plan.scope,
+              'public_task': public_task(case, instructions, start_state),
               'initial_state_hash': initial_hash, 'final_state_hash': backend.snapshot(), 'termination': status,
               'api_error': api_error, 'turns': turns,
               'calls': len(interface.calls), 'elapsed_s': time.perf_counter() - start,
@@ -252,6 +260,7 @@ def run_llm_pilot(output, sessions, *, client, **options):
                     'model': records[0]['model'] if records else None,
                     'effort': records[0]['effort'] if records else None,
                     'instructions': records[0]['instructions'] if records else None,
+                    'start_state': records[0]['start_state'] if records else None,
                     'source_hash': revision, 'order_seed': ORDER_SEED,
                     'order': [f'{c.id}/{cond}/{r}' for c, _, cond, r in sessions],
                     'usage': dict(sum((Counter(r['usage']) for r in records), Counter())),
@@ -263,14 +272,19 @@ def run_llm_pilot(output, sessions, *, client, **options):
 def main():
     parser = argparse.ArgumentParser(description='Run NR OBUE sessions with Claude as the controller (calls the Claude API).')
     parser.add_argument('--scenario', nargs='+', help='Scenario IDs to run, e.g. N01 S03.')
-    parser.add_argument('--all', action='store_true', help='Run all 16 frozen NR scenarios.')
+    parser.add_argument('--all', action='store_true', help='Run all frozen NR scenarios (16, or 12 with --start-state preloaded).')
     parser.add_argument('--condition', nargs='+', choices=['A', 'B', 'C'], default=['A', 'B', 'C'])
     parser.add_argument('--nr-directory', default=str(ROOT / 'outputs/nr_reference'))
     parser.add_argument('--repetitions', type=int, default=1)
     parser.add_argument('--model', default=DEFAULT_MODEL)
     parser.add_argument('--effort', choices=['low', 'medium', 'high', 'xhigh', 'max'], default=DEFAULT_EFFORT)
-    parser.add_argument('--instructions', choices=sorted(INSTRUCTION_VARIANTS), default='standard',
-                        help="Task wording: 'standard' (baseline) or 'neutral' (no hint to correct invalid settings).")
+    parser.add_argument('--instructions', choices=sorted(INSTRUCTION_VARIANTS),
+                        help="Task wording: 'standard' (baseline), 'neutral' (no hint to correct invalid settings) or "
+                             "'operator' (preloaded only: says the operator configured the analyzer). "
+                             "Default: standard, or neutral with --start-state preloaded.")
+    parser.add_argument('--start-state', choices=START_STATES, default='proposed',
+                        help="'proposed' (baseline): probe shown as text, analyzer starts correct. "
+                             "'preloaded': analyzer starts with the probe on every scan; U03-U06 are skipped.")
     parser.add_argument('--max-calls', type=int, default=50, help='Tool-call budget per session.')
     parser.add_argument('--output', default=str(ROOT / 'outputs/llm_pilot'))
     parser.add_argument('--dry-run', action='store_true', help='Print the first session prompt and tools; no API call.')
@@ -279,8 +293,15 @@ def main():
         parser.error('give either --scenario IDs or --all')
     if not 1 <= args.repetitions <= 5:
         parser.error('repetitions must be 1..5')
+    if args.instructions is None:
+        args.instructions = 'neutral' if args.start_state == 'preloaded' else 'standard'
+    elif args.start_state == 'preloaded' and args.instructions == 'standard':
+        parser.error("standard instructions refer to proposed settings, which a preloaded task does not show; "
+                     "use --instructions neutral or operator")
+    elif args.start_state == 'proposed' and args.instructions == 'operator':
+        parser.error('operator instructions claim the analyzer is configured; use them with --start-state preloaded')
 
-    cases = load_cases(args.nr_directory)
+    cases = load_cases(args.nr_directory, args.start_state)
     if args.scenario:
         known = {case.id for case, _ in cases}
         unknown = sorted(set(args.scenario) - known)
@@ -293,9 +314,9 @@ def main():
 
     if args.dry_run:
         case, spectrum, condition, _ = sessions[0]
-        _, _, _, tools = start_session(case, condition, spectrum)
+        _, _, _, tools = start_session(case, condition, spectrum, args.start_state)
         print(json.dumps({'sessions': len(sessions), 'first_session': f'{case.id}/{condition}',
-                          'system': SYSTEM_PROMPT, 'user': task_prompt(case, args.instructions),
+                          'system': SYSTEM_PROMPT, 'user': task_prompt(case, args.instructions, args.start_state),
                           'tools': tools}, indent=2))
         return
 
@@ -303,10 +324,13 @@ def main():
     if not os.environ.get('ANTHROPIC_API_KEY'):
         parser.error('ANTHROPIC_API_KEY is not set; add it to .env or the environment')
     import anthropic
+    if args.model in NO_EFFORT_MODELS:
+        args.effort = None  # Recorded as null; the model has no effort parameter.
     print(f'Running {len(sessions)} Claude session(s) with {args.model} '
-          f'(effort {args.effort}, {args.instructions} instructions).', file=sys.stderr)
+          f'(effort {args.effort}, {args.instructions} instructions, {args.start_state} start).', file=sys.stderr)
     summary = run_llm_pilot(args.output, sessions, client=anthropic.Anthropic(), model=args.model,
-                            effort=args.effort, instructions=args.instructions, max_calls=args.max_calls)
+                            effort=args.effort, instructions=args.instructions, start_state=args.start_state,
+                            max_calls=args.max_calls)
     print(json.dumps({k: summary[k] for k in ('sessions', 'by_condition', 'usage', 'estimated_cost_usd')}, indent=2))
 
 

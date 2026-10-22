@@ -36,9 +36,15 @@ class Analyzer:
                 'plan': plan_to_dict(self.plan), 'state_snapshot_id': self.snapshot()}
 
     def configure(self, index, changes, *, enforce=False):
-        self._check_index(index)
-        settings = replace(self.plan.scans[index].analyzer, **changes)
-        candidate = replace_scan(self.plan, index, analyzer=settings)
+        """index=None applies the changes to every scan (global instrument state, as in SCPI)."""
+        if index is None:
+            indices = range(len(self.plan.scans))
+        else:
+            self._check_index(index)
+            indices = [index]
+        candidate = self.plan
+        for i in indices:
+            candidate = replace_scan(candidate, i, analyzer=replace(candidate.scans[i].analyzer, **changes))
         problems = validate_plan(candidate, scan_index=index)
         executed = not (enforce and problems)
         event = {'operation': 'configure', 'scan_index': index, 'before': self.snapshot(),
@@ -47,7 +53,8 @@ class Analyzer:
         if executed:
             self.plan = candidate
             self.revision += 1
-            self.results.pop(index, None)  # New settings invalidate the old trace.
+            for i in indices:
+                self.results.pop(i, None)  # New settings invalidate the old trace.
         event['after'] = self.snapshot()
         self.events.append(event)
         if not executed:

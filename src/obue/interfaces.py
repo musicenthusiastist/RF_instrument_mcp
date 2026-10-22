@@ -40,7 +40,8 @@ _SCPI_DESCRIPTION = (
     'Acquisition: INIT:CONT OFF, INIT:IMM, *OPC?, TRAC:DATA? TRACE1. '
     'Trace response is comma-separated dBm values for the selected benchmark scan. '
     'SYST:ERR? reads the error queue. '
-    'scan_index (default 0) is MCP scan selection, not a vendor SCPI suffix.')
+    'scan_index (default 0) is MCP scan selection, not a vendor SCPI suffix: it selects the benchmark scan '
+    'that INIT:IMM sweeps and TRAC:DATA? reads. Settings are global instrument state and apply to every scan.')
 
 
 def scpi_enum_token(field, value):
@@ -248,7 +249,8 @@ class Interface:
             raise ValueError('undefined FSVA3000 simulator command')
         field = SCPI_FIELDS[header]
         value = _parse_scpi_value(field, match[2].strip())
-        return _scpi_reply(self._configure({'scan_index': index, field: value}, raw=True))
+        # Instrument settings are global, as on the real analyzer: one write applies to every scan.
+        return _scpi_reply(self._configure({'scan_index': None, field: value}, raw=True))
 
 
 def _strip_sense(header):

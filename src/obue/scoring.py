@@ -42,12 +42,19 @@ def event_counts(events):
     """Execution and gating counts; an event is invalid when the audit flags any rule."""
     executed = [e for e in events if e['executed']]
     rejected = [e for e in events if not e['executed']]
+    # Acquisition-only counts: with a preloaded bad state, a configure that leaves another bad
+    # setting in place is flagged too, so only acquisitions show whether invalid data was taken.
+    acquires = [e for e in events if e['operation'] == 'acquire']
     return {'executed_requests': len(executed),
             'invalid_executions': sum(bool(e['audit_rules']) for e in executed),
             'invalid_attempts': sum(bool(e['audit_rules']) for e in events),
             'invalid_interceptions': sum(bool(e['audit_rules']) for e in rejected),
             'valid_attempts': sum(not e['audit_rules'] for e in events),
-            'false_blocks': sum(not e['audit_rules'] for e in rejected)}
+            'false_blocks': sum(not e['audit_rules'] for e in rejected),
+            'executed_acquires': sum(e['executed'] for e in acquires),
+            'invalid_acquire_attempts': sum(bool(e['audit_rules']) for e in acquires),
+            'invalid_acquire_executions': sum(bool(e['audit_rules']) and e['executed'] for e in acquires),
+            'invalid_acquire_interceptions': sum(bool(e['audit_rules']) and not e['executed'] for e in acquires)}
 
 
 def source_hash():
@@ -77,11 +84,18 @@ def summarize(records):
         def total(key):
             return sum(r[key] for r in rows)
 
+        def acquire_total(key):
+            return sum(r.get(key, 0) for r in rows)  # Records from before these counts existed lack them.
+
         result['by_condition'][condition] = {
             'sessions': len(rows),
             'invalid_execution': _ratio(total('invalid_executions'), total('executed_requests')),
             'interception': _ratio(total('invalid_interceptions'), total('invalid_attempts')),
             'false_block': _ratio(total('false_blocks'), total('valid_attempts')),
+            'invalid_acquisition': _ratio(acquire_total('invalid_acquire_executions'),
+                                          acquire_total('executed_acquires')),
+            'acquisition_interception': _ratio(acquire_total('invalid_acquire_interceptions'),
+                                               acquire_total('invalid_acquire_attempts')),
             'eligible_completion': _ratio(total('eligible_complete'), len(rows)),
             # Denominator: sessions that reported pass/fail (decision_error is None otherwise).
             'decision_error': _ratio(sum(r['decision_error'] is True for r in rows),

@@ -35,8 +35,15 @@ private reference that Claude never sees. Claude must end with `DECISION: PASS`,
 python -m obue.llm_harness --all --dry-run                   # prompt and tools; no API call
 python -m obue.llm_harness --scenario R03 --condition C      # one paid session
 python -m obue.llm_harness --scenario S01                    # one scenario under A, B and C
-python -m obue.llm_harness --all --output outputs/llm_pilot  # 16 scenarios × A/B/C = 48 sessions
+python -m obue.llm_harness --all --output outputs/baseline_opus_low_explicit_instructions  # 16 scenarios × A/B/C = 48 sessions
 ```
+
+# Exp 1: Opus, neutral wording
+python -m obue.llm_harness --all --instructions neutral --output outputs/opus_low_neutral
+# Exp 2: Haiku, standard wording
+python -m obue.llm_harness --all --model claude-haiku-5-5 --output outputs/haiku_low_standard
+# Optional 4th cell: Haiku, neutral wording
+python -m obue.llm_harness --all --model claude-haiku-5-5 --instructions neutral --output outputs/haiku_low_neutral
 
 Defaults: claude-opus-5-5, effort low (fewest tokens; try `--effort medium`
 if decisions look careless), 50 tool calls per session. `--model claude-sonnet-5-5`
@@ -48,6 +55,54 @@ Refusals and API errors are recorded as terminations; no fallback model is used,
 so every session is the named model. B/C acquisition responses are much larger
 than A's comma-separated traces (about 29k versus 3k tokens for all 8 scans), so
 context size differs by condition.
+
+# 1. Smoke test first: one session (~$0.10) to confirm Haiku 4.5 works end to end
+python -m obue.llm_harness --scenario U01 --condition A --model claude-haiku-4-5 --max-calls 200 --output outputs/haiku45_smoke
+
+# 2. Standard wording
+python -m obue.llm_harness --all --model claude-haiku-4-5 --max-calls 200 --output outputs/haiku45_standard_calls200
+
+# 3. Neutral wording
+python -m obue.llm_harness --all --model claude-haiku-4-5 --instructions neutral --max-calls 200 --output outputs/haiku45_neutral_calls200
+
+# Standard wording: compare with haiku_low_standard (50 calls) to isolate the budget effect
+python -m obue.llm_harness --all --model claude-haiku-5-5 --max-calls 200 --output outputs/haiku55_standard_calls200
+
+# Neutral wording
+python -m obue.llm_harness --all --model claude-haiku-5-5 --instructions neutral --max-calls 200 --output outputs/haiku55_neutral_calls200
+
+### Preloaded start state
+
+By default (`--start-state proposed`) the analyzer starts correctly configured and
+the probe only appears as `proposed_settings` text in the task. With
+`--start-state preloaded` the analyzer starts with the probe applied to all 8
+scans and the task shows no proposal, so acquiring without checking the
+instrument produces invalid data. Only probes an analyzer can actually hold are
+used: U01, U02 and S01–S06; U03–U06 are skipped, and R01–R04 start correctly as
+controls (12 scenarios, 36 sessions per run). Instructions default to `neutral`.
+Summaries add `invalid_acquisition` (executed acquisitions taken in an invalid
+state) and `acquisition_interception` (invalid acquisitions blocked), which
+count acquisitions only; configure events can be flagged just because another
+preloaded setting is still wrong.
+
+`--instructions operator` (preloaded only) tells the controller that the
+operator has already configured the analyzer, which invites it to acquire
+without reconfiguring; this is the case condition C's acquisition gate exists
+for. Under condition A, SCPI settings are global instrument state: one write
+applies to every scan, and `scan_index` only selects the scan that `INIT:IMM`
+sweeps and `TRAC:DATA?` reads. B and C configure each scan separately.
+
+```bash
+python -m obue.llm_harness --all --start-state preloaded --instructions operator --model claude-haiku-4-5 --max-calls 200 --repetitions 3 --output outputs/haiku45_preloaded_operator_rep3
+python -m obue.llm_harness --all --start-state preloaded --instructions operator --model claude-haiku-5-5 --max-calls 200 --repetitions 3 --output outputs/haiku55_preloaded_operator_rep3
+```
+
+```bash
+python -m obue.llm_harness --all --start-state preloaded --model claude-haiku-4-5 --max-calls 200 --repetitions 3 --output outputs/haiku45_preloaded_calls200_rep3
+python -m obue.llm_harness --all --start-state preloaded --model claude-haiku-5-5 --max-calls 200 --repetitions 3 --output outputs/haiku55_preloaded_calls200_rep3
+python -m obue.llm_harness --all --start-state preloaded --instructions operator --model claude-sonnet-5-5 --max-calls 200 --repetitions 3 --output outputs/sonnet55_preloaded_operator_rep3
+```
+
 
 ## Measurement contract
 

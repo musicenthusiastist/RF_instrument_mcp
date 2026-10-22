@@ -11,7 +11,7 @@ from .config import ROOT
 from .interfaces import Interface
 from .nr import load_nr_spectra, nr_directory
 from .plan import default_plan
-from .scenarios import scenarios
+from .scenarios import START_STATES, initial_plan, scenarios
 from .simulator import Analyzer
 
 PROTOCOL_VERSIONS = ('2025-03-26', '2025-06-18', '2025-11-25')
@@ -79,10 +79,21 @@ def main():
                         help='Selects the input signal: R01-R04 use controlled tone IQ; '
                              'others (or none) use the clean NR records.')
     parser.add_argument('--nr-directory', default=str(ROOT / 'outputs/nr_reference'))
+    parser.add_argument('--start-state', choices=START_STATES, default='proposed',
+                        help="'preloaded' starts the analyzer with the scenario's probe on every scan.")
     args = parser.parse_args()
+    if args.start_state == 'preloaded' and args.scenario is None:
+        parser.error('--start-state preloaded needs --scenario')
 
     spectrum = load_nr_spectra(nr_directory(args.nr_directory, args.scenario))
-    server = Server(Interface(Analyzer(default_plan(), spectrum), args.condition))
+    plan = default_plan()
+    if args.scenario:
+        case = next(s for s in scenarios() if s.id == args.scenario)
+        try:
+            plan = initial_plan(case, args.start_state)
+        except ValueError as exc:
+            parser.error(str(exc))
+    server = Server(Interface(Analyzer(plan, spectrum), args.condition))
     for line in sys.stdin:
         try:
             request = json.loads(line)

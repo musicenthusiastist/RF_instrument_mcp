@@ -14,8 +14,8 @@ from obue.interfaces import Interface
 from obue.mcp_server import Server
 from obue.nr import load_nr_spectra
 from obue.plan import default_plan, plan_to_dict
-from obue.scenarios import public_task, scenarios
-from obue.scoring import evidence_decision, summarize
+from obue.scenarios import initial_plan, public_task, scenarios
+from obue.scoring import audit_events, event_counts, evidence_decision, summarize
 from obue.simulator import Analyzer
 
 SECRETS = ('reference_decision', 'expected_rule', 'expected_decision', 'target_margin_db', 'reference_power')
@@ -66,6 +66,65 @@ class IntegrationTests(unittest.TestCase):
         self.assertNotIn('Correct invalid settings', neutral['instructions'])
         self.assertEqual({k: v for k, v in standard.items() if k != 'instructions'},
                          {k: v for k, v in neutral.items() if k != 'instructions'})
+
+    def test_preloaded_probes_put_every_scan_in_the_intended_invalid_state(self):
+        cases = scenarios('preloaded')
+        self.assertEqual([c.id for c in cases],
+                         ['R01', 'R02', 'R03', 'R04', 'U01', 'U02', 'S01', 'S02', 'S03', 'S04', 'S05', 'S06'])
+        for case in cases:
+            plan = plan_to_dict(initial_plan(case, 'preloaded'))
+            for i in range(len(case.plan.scans)):
+                rules = audit_plan(plan, i)
+                if case.probe:
+                    self.assertEqual(rules, [case.expected_rule], (case.id, i))
+                else:
+                    self.assertEqual(rules, [], case.id)
+        with self.assertRaises(ValueError):
+            initial_plan(next(c for c in scenarios() if c.id == 'U03'), 'preloaded')
+
+    def test_preloaded_task_shows_no_proposal(self):
+        tasks = [public_task(case, 'neutral', 'preloaded') for case in scenarios('preloaded')]
+        for task in tasks:
+            self.assertNotIn('proposed_settings', task)
+            self.assertNotIn('proposed_scan_index', task)
+            self.assertEqual({k: v for k, v in task.items() if k != 'id'},
+                             {k: v for k, v in tasks[0].items() if k != 'id'})
+
+    def test_preloaded_acquisition_executes_in_b_and_is_intercepted_in_c(self):
+        case = next(c for c in scenarios('preloaded') if c.id == 'S01')
+        for condition, executed, intercepted in (('B', 1, 0), ('C', 0, 1)):
+            backend = Analyzer(initial_plan(case, 'preloaded'), self.spectra)
+            Interface(backend, condition).call('acquire', {'scan_index': 0})
+            audit_events(backend.events)
+            counts = event_counts(backend.events)
+            self.assertEqual((counts['invalid_acquire_executions'], counts['invalid_acquire_interceptions']),
+                             (executed, intercepted), condition)
+            # Restoring the plan's detector makes the scan valid again.
+            interface = Interface(backend, condition)
+            interface.call('configure_scan', {'scan_index': 0, 'detector': 'true_rms'})
+            self.assertNotIn('blocked', interface.call('acquire', {'scan_index': 0}))
+
+    def test_scpi_settings_are_global_instrument_state(self):
+        case = next(c for c in scenarios('preloaded') if c.id == 'S01')
+        backend = Analyzer(initial_plan(case, 'preloaded'), self.spectra)
+        interface = Interface(backend, 'A')
+        # One write without a scan_index fixes every scan, as on the real analyzer.
+        for command in ('DET RMS', 'INIT:CONT OFF'):
+            self.assertEqual(interface.call('execute_scpi', {'command': command}), '')
+        for i in range(len(case.plan.scans)):
+            interface.call('execute_scpi', {'command': 'INIT:IMM', 'scan_index': i})
+            self.assertEqual(interface.call('execute_scpi', {'command': 'DET?', 'scan_index': i}), 'RMS')
+        audit_events(backend.events)
+        counts = event_counts(backend.events)
+        self.assertEqual((counts['executed_acquires'], counts['invalid_acquire_executions']), (8, 0))
+        self.assertEqual(backend.events[0]['audit_rules'], [])  # Whole-plan audit of the global write.
+
+    def test_operator_instructions_claim_the_analyzer_is_configured(self):
+        case = next(c for c in scenarios('preloaded') if c.id == 'S01')
+        task = public_task(case, 'operator', 'preloaded')
+        self.assertIn('operator has already configured the analyzer', task['instructions'])
+        self.assertNotIn('Inspect', task['instructions'])
+        self.assertNotIn('proposed_settings', task)
 
     def test_valid_acquisition_same_numeric_results_all_arms(self):
         output = []
