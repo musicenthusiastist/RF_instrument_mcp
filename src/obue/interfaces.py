@@ -1,6 +1,6 @@
 """Three adapters with the same configure/acquire/state operation surface.
 
-A uses an R&S FSVA3000 command subset; no simulator-only SCPI commands.
+A uses an R&S FSVA3000 SCPI command subset.
 B validates primitive shapes/bounds. C additionally applies physical/state rules.
 """
 import json
